@@ -1,4 +1,3 @@
-const express = require("express");
 const cors = require("cors");
 
 const { authors, books, sales, withdrawals } = require("./data");
