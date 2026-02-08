@@ -1,3 +1,4 @@
+const express = require("express");
 const cors = require("cors");
 
 const { authors, books, sales, withdrawals } = require("./data");
@@ -5,7 +6,8 @@ const { authors, books, sales, withdrawals } = require("./data");
 const app = express();
 app.use(cors());
 app.use(express.json());
-// ===== HELPER FUNCTIONS =====
+
+// ================= HELPER FUNCTIONS =================
 
 function calculateAuthorEarnings(authorId) {
   const authorBooks = books.filter(b => b.author_id === authorId);
@@ -28,8 +30,9 @@ function calculateWithdrawnAmount(authorId) {
     .reduce((sum, w) => sum + w.amount, 0);
 }
 
-// ===== ROUTES =====
+// ================= ROUTES =================
 
+// GET /authors
 app.get("/authors", (req, res) => {
   const result = authors.map(author => {
     const total = calculateAuthorEarnings(author.id);
@@ -46,16 +49,11 @@ app.get("/authors", (req, res) => {
   res.json(result);
 });
 
-const PORT = process.env.PORT || 3000;
-
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
-
+// GET /authors/:id
 app.get("/authors/:id", (req, res) => {
   const authorId = parseInt(req.params.id);
-
   const author = authors.find(a => a.id === authorId);
+
   if (!author) {
     return res.status(404).json({ error: "Author not found" });
   }
@@ -89,6 +87,37 @@ app.get("/authors/:id", (req, res) => {
   });
 });
 
+// GET /authors/:id/sales
+app.get("/authors/:id/sales", (req, res) => {
+  const authorId = parseInt(req.params.id);
+  const author = authors.find(a => a.id === authorId);
+
+  if (!author) {
+    return res.status(404).json({ error: "Author not found" });
+  }
+
+  const authorBookIds = books
+    .filter(b => b.author_id === authorId)
+    .map(b => b.id);
+
+  const result = sales
+    .filter(s => authorBookIds.includes(s.book_id))
+    .map(sale => {
+      const book = books.find(b => b.id === sale.book_id);
+
+      return {
+        book_title: book.title,
+        quantity: sale.quantity,
+        royalty_earned: sale.quantity * book.royalty,
+        sale_date: sale.date
+      };
+    })
+    .sort((a, b) => new Date(b.sale_date) - new Date(a.sale_date));
+
+  res.json(result);
+});
+
+// POST /withdrawals
 app.post("/withdrawals", (req, res) => {
   const { author_id, amount } = req.body;
 
@@ -123,4 +152,30 @@ app.post("/withdrawals", (req, res) => {
     ...withdrawal,
     new_balance: balance - amount
   });
+});
+
+// GET /authors/:id/withdrawals
+app.get("/authors/:id/withdrawals", (req, res) => {
+  const authorId = parseInt(req.params.id);
+  const author = authors.find(a => a.id === authorId);
+
+  if (!author) {
+    return res.status(404).json({ error: "Author not found" });
+  }
+
+  const result = withdrawals
+    .filter(w => w.author_id === authorId)
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+  res.json(result);
+});
+
+// ================= SERVER START (RENDER SAFE) =================
+
+console.log("Starting server...");
+
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });
